@@ -36,13 +36,13 @@ def initialize_graph_store():
                 RETURN count(n) as node_count
             """)
             node_count = result.single()["node_count"]
-            st.sidebar.write(f"Found {node_count} existing nodes in Neo4j")
+            st.sidebar.write(f"Found {node_count} existing nodes in Graph")
         driver.close()
         
-        st.sidebar.success("Neo4j Graph Store initialized successfully")
+        st.sidebar.success("Knowledge Graph initialized successfully")
         return graph_store
     except Exception as e:
-        st.sidebar.error(f"Error initializing Neo4j Graph Store: {str(e)}")
+        st.sidebar.error(f"Error initializing Knowldge Graph: {str(e)}")
         return None
 
 def initialize_index(graph_store):
@@ -111,13 +111,26 @@ def initialize_query_engine(index):
 def main():
     st.title("Chat with Contracts using Knowledge Graph")
     
-    # Debug information
-    st.sidebar.write("### Debug Information")
-    st.sidebar.write(f"Neo4j URI: {NEO4J_URI}")
-    st.sidebar.write(f"Neo4j Username: {NEO4J_USERNAME}")
+    # Initialize all session state variables at the start
+    if 'processing' not in st.session_state:
+        st.session_state.processing = False
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []
+    if 'graph_store' not in st.session_state:
+        st.session_state.graph_store = None
+    if 'index' not in st.session_state:
+        st.session_state.index = None
+    if 'query_engine' not in st.session_state:
+        st.session_state.query_engine = None
     
     # Add sidebar options
     with st.sidebar:
+        st.write("### Upload Contract")
+        # File uploader in sidebar
+        if not st.session_state.processing:
+            uploaded_file = st.file_uploader("Upload a PDF file", type=['pdf'])
+        
+        st.write("---")  # Add a separator
         st.write("### Database Controls")
         if st.button("Clear Database"):
             clear_neo4j_database()
@@ -138,16 +151,14 @@ def main():
             driver.close()
 
     # Initialize graph store
-    if 'graph_store' not in st.session_state:
-        st.sidebar.write("Initializing graph store...")
+    if st.session_state.graph_store is None:
         st.session_state.graph_store = initialize_graph_store()
         if st.session_state.graph_store is None:
             st.error("Failed to initialize graph store. Check Neo4j connection details.")
             return
     
     # Initialize index
-    if ('index' not in st.session_state or st.session_state.index is None) and st.session_state.graph_store is not None:
-        st.sidebar.write("Initializing index...")
+    if st.session_state.index is None and st.session_state.graph_store is not None:
         st.session_state.index = initialize_index(st.session_state.graph_store)
         if st.session_state.index is None:
             st.error("Failed to initialize index. Please check Neo4j connection and try again.")
@@ -157,18 +168,6 @@ def main():
         if st.session_state.query_engine is None:
             st.error("Failed to initialize query engine.")
             return
-    
-    # Add a state to track if we're processing a document
-    if 'processing' not in st.session_state:
-        st.session_state.processing = False
-    
-    # Initialize chat history
-    if 'messages' not in st.session_state:
-        st.session_state.messages = []
-    
-    # File uploader
-    if not st.session_state.processing:
-        uploaded_file = st.file_uploader("Upload a PDF file", type=['pdf'])
     
     if uploaded_file and not st.session_state.processing:
         # Check if index is properly initialized
