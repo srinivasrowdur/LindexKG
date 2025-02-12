@@ -122,13 +122,18 @@ def main():
         st.session_state.index = None
     if 'query_engine' not in st.session_state:
         st.session_state.query_engine = None
+    if 'last_uploaded_file' not in st.session_state:
+        st.session_state.last_uploaded_file = None
     
     # Add sidebar options
     with st.sidebar:
         st.write("### Upload Contract")
         # File uploader in sidebar
-        if not st.session_state.processing:
-            uploaded_file = st.file_uploader("Upload a PDF file", type=['pdf'])
+        uploaded_file = st.file_uploader("Upload a PDF file", type=['pdf'])
+        
+        # Show currently processing file if any
+        if st.session_state.processing:
+            st.info(f"Processing: {st.session_state.last_uploaded_file}")
         
         st.write("---")  # Add a separator
         st.write("### Database Controls")
@@ -170,12 +175,19 @@ def main():
             return
     
     if uploaded_file and not st.session_state.processing:
+        current_file = uploaded_file.name
+        # Check if this file was already processed
+        if current_file == st.session_state.last_uploaded_file:
+            return
+
         # Check if index is properly initialized
         if st.session_state.index is None:
             st.error("Index not initialized. Please check Neo4j connection and try again.")
             return
 
         st.session_state.processing = True
+        st.session_state.last_uploaded_file = current_file
+        
         # Read the PDF content
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_file_path = os.path.join(temp_dir, uploaded_file.name)
@@ -187,16 +199,13 @@ def main():
             for doc in documents:
                 process_document(st.session_state.index, doc.text)
         
-        st.success('PDF processed successfully!')
         # Refresh query engine after all documents are processed
         with st.spinner('Initializing query engine...'):
             st.session_state.query_engine = initialize_query_engine(st.session_state.index)
-    
-    # Reset processing state after file upload widget is shown
-    if st.session_state.processing:
+        
+        # Show success and reset processing state
+        st.success(f'PDF "{current_file}" processed successfully!')
         st.session_state.processing = False
-        # Clear the uploaded file from memory
-        st.session_state.uploaded_file = None
     
     # Chat interface
     if st.session_state.index is not None:
