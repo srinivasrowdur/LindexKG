@@ -87,7 +87,6 @@ def process_document(index, file_content):
         # Use insert_nodes to properly process the document
         with st.spinner('Processing document...'):
             index.insert_nodes([document])
-        st.sidebar.success("Document processed and added to knowledge graph")
     except Exception as e:
         st.sidebar.error(f"Error processing document: {str(e)}")
 
@@ -188,24 +187,31 @@ def main():
         st.session_state.processing = True
         st.session_state.last_uploaded_file = current_file
         
-        # Read the PDF content
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_file_path = os.path.join(temp_dir, uploaded_file.name)
-            with open(temp_file_path, "wb") as f:
-                f.write(uploaded_file.getvalue())
-            documents = SimpleDirectoryReader(temp_dir).load_data()
-            
-            # Process each document
-            for doc in documents:
-                process_document(st.session_state.index, doc.text)
+        with st.spinner(f'Processing "{current_file}"...'):
+            # Read the PDF content
+            with tempfile.TemporaryDirectory() as temp_dir:
+                temp_file_path = os.path.join(temp_dir, uploaded_file.name)
+                with open(temp_file_path, "wb") as f:
+                    f.write(uploaded_file.getvalue())
+                documents = SimpleDirectoryReader(temp_dir).load_data()
+                
+                # Show chunk processing info
+                total_chunks = len(documents)
+                st.sidebar.info(f"Processing {total_chunks} chunks from document...")
+                
+                # Process each document
+                for i, doc in enumerate(documents, 1):
+                    st.sidebar.write(f"Processing chunk {i}/{total_chunks}")
+                    process_document(st.session_state.index, doc.text)
         
-        # Refresh query engine after all documents are processed
-        with st.spinner('Initializing query engine...'):
-            st.session_state.query_engine = initialize_query_engine(st.session_state.index)
+            # Refresh query engine after all documents are processed
+            with st.spinner('Initializing query engine...'):
+                st.session_state.query_engine = initialize_query_engine(st.session_state.index)
         
-        # Show success and reset processing state
-        st.success(f'PDF "{current_file}" processed successfully!')
-        st.session_state.processing = False
+            # Show success and reset processing state
+            st.sidebar.success(f"All {total_chunks} chunks processed successfully!")
+            st.success(f'PDF "{current_file}" processed successfully!')
+            st.session_state.processing = False
     
     # Chat interface
     if st.session_state.index is not None:
